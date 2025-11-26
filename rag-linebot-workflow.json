@@ -1,0 +1,515 @@
+{
+  "name": "rag-linebot-workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "text/plain"
+            }
+          }
+        }
+      },
+      "id": "043cf2c8-583a-427d-8216-5b11b7109fbb",
+      "name": "Download File1",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        352,
+        688
+      ],
+      "executeOnce": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Fi9ubOm83E4ACZPh",
+          "name": "kdanJasonGoogleDrive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "Google_Drive_vectorbase",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        688
+      ],
+      "id": "ca550b82-7613-4fc6-b020-00debc21dbdf",
+      "name": "Qdrant Vector Store",
+      "credentials": {
+        "qdrantApi": {
+          "id": "r9wFaV62PxiEngOW",
+          "name": "QdrantApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        624,
+        688
+      ],
+      "id": "cdeb3e0e-0113-45d9-b2c2-e65d228bded7",
+      "name": "Extract From PDF"
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "id": "422b14f9-e910-4828-9568-4a7e973421ff",
+      "name": "Embeddings OpenAI3",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1,
+      "position": [
+        864,
+        864
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "JuJAUvlNJP5AKaR5",
+          "name": "KdanOpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        1088,
+        880
+      ],
+      "id": "238820f1-5677-4d62-b439-00d7afcac74a",
+      "name": "Default Data Loader1"
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 200,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        1040
+      ],
+      "id": "d2e01ff7-a1d6-4f3a-9e6e-5e1a2fa7438b",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "triggerOn": "specificFolder",
+        "folderToWatch": {
+          "__rl": true,
+          "value": "1ftpoQX808RiNVJQpE57UE4WnQZHVpCGX",
+          "mode": "list",
+          "cachedResultName": "RAG_DriveBase",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1ftpoQX808RiNVJQpE57UE4WnQZHVpCGX"
+        },
+        "event": "fileCreated",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDriveTrigger",
+      "typeVersion": 1,
+      "position": [
+        48,
+        688
+      ],
+      "id": "0d0c74c0-0974-4127-89cc-83c378e6becb",
+      "name": "Google Drive Trigger",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Fi9ubOm83E4ACZPh",
+          "name": "kdanJasonGoogleDrive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "text-embedding-3-small",
+        "options": {}
+      },
+      "id": "8378e247-3059-4b01-8e74-cdf428802e23",
+      "name": "Embeddings OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1,
+      "position": [
+        752,
+        496
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "JuJAUvlNJP5AKaR5",
+          "name": "KdanOpenAi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "line-message",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        128
+      ],
+      "id": "4345aaca-ba9b-4e18-8679-b666a4177271",
+      "name": "Webhook",
+      "webhookId": "9ef62b0f-1c75-49d7-a20e-5f748b65c15a"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Webhook').item.json.body.events[0].message.text }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "You are a personal assistant who helps answer questions from a corpus of documents when you don't know the answer yourself.Please do not use any markdown or special formatting (such as **bold**, # headings, or lists). Respond using plain text only, with paragraph breaks for clarity."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        416,
+        96
+      ],
+      "id": "014a3e3a-bb70-470e-a4e6-daea7a6ba5c4",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Be a retrieval database",
+        "qdrantCollection": {
+          "__rl": true,
+          "value": "Google_Drive_vectorbase",
+          "mode": "list",
+          "cachedResultName": "Google_Drive_vectorbase"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreQdrant",
+      "typeVersion": 1.3,
+      "position": [
+        528,
+        352
+      ],
+      "id": "c6b07c2b-8591-45fb-adc6-5dbdba914e97",
+      "name": "Qdrant Vector Store1",
+      "credentials": {
+        "qdrantApi": {
+          "id": "r9wFaV62PxiEngOW",
+          "name": "QdrantApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        224,
+        336
+      ],
+      "id": "1dfcbdf8-0ac1-4b33-9745-7cc85599f04c",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "OimrROeAuv0A0d8L",
+          "name": "kdan_gemini"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook').item.json.body.events[0].source.userId }}"
+      },
+      "id": "59f07174-a811-4ab2-ac13-9a4c57c35980",
+      "name": "Postgres Chat Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1,
+      "position": [
+        400,
+        416
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "postgres": {
+          "id": "HMVa5iaUwbqHOejw",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.line.me/v2/bot/message/reply",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"replyToken\": \"{{ $('Webhook').item.json.body.events[0].replyToken }}\",\n  \"messages\": [\n    {\n      \"type\": \"text\",\n      \"text\": {{ $json.text }}\n\n    }\n  ]\n}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1280,
+        64
+      ],
+      "id": "d39372cc-e7a7-4768-96fe-7f2b5a5f6e2c",
+      "name": "發送回應給 LINE",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "IVv9EIHoLPrJ240F",
+          "name": "LineBotOA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw =$input.first().json.output ;\n\nconst cleaned = raw.trim().replace(/\\\\n/g, '\\n'); // 讓你輸入中的 `\\n` 變成真正的換行\n\nreturn [\n  {\n    json: {\n      text: JSON.stringify(cleaned)\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        64
+      ],
+      "id": "15475065-e10b-4a5e-99ef-16095d4c04b0",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cloud.langfuse.com/api/public/traces",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "=\n{\n  \"name\": \"rag-conversation-start\",\n  \"userId\": \"{{ $('Webhook').item.json.body.events[0].source.userId }}\",\n  \"sessionId\": \"{{ $('Webhook').item.json.body.events[0].source.userId }}\",\n  \"input\": {\n    \"message\": \"{{ $('Webhook').item.json.body.events[0].message.text }}\",\n    \"starttime\": \"{{ new Date().toLocaleString(\"zh-TW\", { timeZone: \"Asia/Taipei\" }) }}\",\n    \"messageType\": \"{{ $('Webhook').item.json.body.events[0].message.type }}\"\n  },\n\"output\": {\n    \"response\": {{$json.text}},\n    \"status\": \"completed\",\n    \"responseLength\": {{$json.text ? $json.text.length : 0}},\n\"endtime\":\"{{ new Date().toLocaleString(\"zh-TW\", { timeZone: \"Asia/Taipei\" }) }}\"\n  },\n  \"metadata\": {\n    \"final_response_sent\": \"true\",\n    \"line_reply_token\": \"{{$('Webhook').item.json.body.events[0].replyToken}}\",\n    \"source\": \"line\",\n    \"workflow\": \"rag-linebot\",\n    \"platform\": \"n8n\",\n    \"embedding_model\": \"text-embedding-3-small\",\n    \"vector_store\": \"qdrant\",\n    \"chat_model\": \"gemini-1.5-flash\",\n\"systen_prompt\": \"You are a personal assistant who helps answer questions from a corpus of documents when you don't know the answer yourself.Please do not use any markdown or special formatting (such as **bold**, # headings, or lists). Respond using plain text only, with paragraph breaks for clarity.\"\n  },\n  \"tags\": [\"rag\", \"linebot\", \"conversation\"]\n}\n\n\n\n   \n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1184,
+        288
+      ],
+      "id": "7f141320-1ef0-4b14-ae4c-f8d16de7ba9d",
+      "name": "Langfuse - Start Trace",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "50vbphbgtvuqKaQF",
+          "name": "Langfuse API"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Download File1": {
+      "main": [
+        [
+          {
+            "node": "Extract From PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract From PDF": {
+      "main": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI3": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader1": {
+      "ai_document": [
+        [
+          {
+            "node": "Qdrant Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader1",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Drive Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Qdrant Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qdrant Vector Store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Langfuse - Start Trace",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "發送回應給 LINE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b1d09188-4a93-42a2-aa97-c5e64cf385d8",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "136a4c2ddbc17839cf2e36e040251640d22817a8cca6f538ba1bc3ce9889169d"
+  },
+  "id": "pDOx4IJM6kVZ8L5I",
+  "tags": []
+}

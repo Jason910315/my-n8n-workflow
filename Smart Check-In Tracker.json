@@ -1,0 +1,713 @@
+{
+  "name": "Smart Check-In Tracker",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "spreadsheet",
+        "title": "WorkingTimeTracing",
+        "sheetsUi": {
+          "sheetValues": [
+            {
+              "title": "Working"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        -48,
+        -64
+      ],
+      "id": "2f359873-c037-4e3e-abcf-9c596729fea5",
+      "name": "Create spreadsheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GWErEwDjXXjlXdGe",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "queryString": "WorkingTimeTracking",
+        "filter": {},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -640,
+        96
+      ],
+      "id": "eb5ce1c8-f9f1-46a6-8e52-63a63f0c68a4",
+      "name": "Search files and folders",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "EVUPpodO0UFwE7sn",
+          "name": "KdanJasongcp"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Create spreadsheet').item.json.spreadsheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "=Working",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Check_In",
+              "displayName": "Check_In",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Check_Out",
+              "displayName": "Check_Out",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        336,
+        -64
+      ],
+      "id": "70d3a45f-87d0-4e73-840b-541015b9c4b1",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GWErEwDjXXjlXdGe",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\n  \"todayDate\": \"{{ $now.format('yyyy-MM-dd') }}\",\n  \"currentTime\": \"{{ $now.format('HH:mm:ss') }}\",\n  \"direction\": \"{{ $('Webhook').item.json.headers.direction ? $('Webhook').item.json.headers.direction : 'Check-In'}}\",\n\"spreadsheetId\": \"{{ $('Search files and folders').item.json.id }}\"\n}",
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -64,
+        144
+      ],
+      "id": "b14df1f9-96d8-4b99-9de9-522d63ad3462",
+      "name": "Set Basic Data"
+    },
+    {
+      "parameters": {
+        "path": "working-time-checking",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        96
+      ],
+      "id": "04213525-7d99-4058-9803-b0ae809ab970",
+      "name": "Webhook",
+      "webhookId": "2f243810-d331-4945-97d0-6f1bf0162292"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 完整的打卡處理邏輯，統一先讀取資料再決定動作\nconst basicData = $('Set Basic Data').first().json\nconst todayDate = basicData.todayDate\nconst dayOfWeek = new Date(todayDate).getDay();\nconst direction = basicData.direction;\nconst currentTime = basicData.currentTime;\nconst spreadsheetId = basicData.spreadsheetId;\n\n// 無論是 Check-In 還是 Check-Out，都需要先讀取資料來檢查今天是否已有記錄\nreturn [\n  {\n    json: {\n      action: \"read_first\",  // action 初始都是 read_first\n      todayDate: todayDate,\n      currentTime: currentTime,\n      direction: direction,\n      spreadsheetId: spreadsheetId,\n      message: `Processing ${direction} for ${todayDate}`,\n      dayOfWeek: dayOfWeek,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        400
+      ],
+      "id": "054e00d0-62e9-44ad-b4b7-1b79498f0527",
+      "name": "Complete Attendance Handler"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      empty: items.length == 1 && Object.keys(items[0].json).length == 0,\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        96
+      ],
+      "id": "8621f282-d34c-48cd-9416-220cd3e6c51e",
+      "name": "Return if Null"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "307fa799-f7d3-46d1-92c5-b683b970bb31",
+              "leftValue": "={{ $json.empty }}",
+              "rightValue": "=",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -256,
+        96
+      ],
+      "id": "2a5473e7-9f54-4223-99bd-363bb1d80a79",
+      "name": "Doesn't exist?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 處理所有打卡邏輯（Check-In 和 Check-Out）\nconst basicData = $(\"Complete Attendance Handler\").first().json;\nconst sheetData = $input.first().json;\n// 上一個節點取得的資訊\nconst todayDate = basicData.todayDate;\nconst currentTime = basicData.currentTime;\nconst direction = basicData.direction;\nconst spreadsheetId = basicData.spreadsheetId;\n\nconst values = sheetData.values || [];  // 取出 sheetData 的值，若其為空則返回空陣列 []\nlet foundRowIndex = -1;\nlet foundRow = null;\n\n// 尋找今天的記錄（從第二行開始，跳過標題）\nfor (let i = 1; i < values.length; i++) {\n  const row = values[i];   // values 包含 Date、Check-In、Check-Out\n  if (row[0] === todayDate) {  // 若今日日期在 sheet 已有記錄 (代表今日已經打卡，可能中途離開公司)\n    // Date 欄位\n    foundRowIndex = i + 1; // Google Sheets 行號從 1 開始\n    foundRow = row;\n    break;\n  }\n}\n\n// 判斷 webhook 傳來的動作是否為 Check-In (只要靠近公司就會發 Check-In，因此可能重複打卡，需判斷)\nif (direction === \"Check-In\") {\n  if (foundRowIndex > 0) {\n    // foundRowIndex > 0 代表今天有找到 Check-In 記錄，不執行任何動作\n    return [\n      {\n        json: {\n          action: \"skip\",  // 後續靠此值判斷是否跳過\n          message: `Check-In already exists for ${todayDate}. Skipping.`,\n          spreadsheetId: spreadsheetId,\n        },\n      },\n    ];\n  } else {\n    // 今天沒有記錄，代表剛到公司，新增 Check-In 記錄\n    return [\n      {\n        json: {\n          action: \"append\",\n          data: {\n            values: [[todayDate, currentTime, \"\"]],\n          },\n          spreadsheetId: spreadsheetId,\n          message: `Creating new Check-In record for ${todayDate}`,\n        },\n      },\n    ];\n  }\n} \n// 若 webhook 傳來資訊是 Check-Out，代表人員遠離公司 (不論是否打卡都會更新)\nelse if (direction === \"Check-Out\") {\n  if (foundRowIndex > 0) {\n    // 找到今天的記錄 (有 Check-In 記錄)，直接更新 Check-Out 欄位 (無論有無舊資料都會覆蓋)\n    return [\n      {\n        json: {\n          action: \"update\",\n          rowIndex: foundRowIndex,\n          range: `Working!C${foundRowIndex}`, // C 欄是 Check-Out，列數是 foundRowIndex，當天的日期位置\n          values: [[currentTime]],\n          spreadsheetId: spreadsheetId,\n          message: `Updating/Overwriting Check-Out for ${todayDate} at row ${foundRowIndex}`,\n        },\n      },\n    ];\n  } else {\n    // 沒找到今天的記錄，新增一筆只有 Check-Out 的記錄\n    return [\n      {\n        json: {\n          action: \"append\",\n          data: {\n            values: [[todayDate, \"\", currentTime]],\n          },\n          spreadsheetId: spreadsheetId,\n          message: `Creating new Check-Out record for ${todayDate}`,\n        },\n      },\n    ];\n  }\n} else {\n  return [\n    {\n      json: {\n        action: \"error\",\n        message: \"Invalid direction. Use Check-In or Check-Out.\",\n        spreadsheetId: spreadsheetId,\n      },\n    },\n  ];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        384
+      ],
+      "id": "20e4e484-5840-4c0b-9f61-4c4a8120df13",
+      "name": "Process Attendance"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "90223265-d7db-4487-8834-e8295d0787b9",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "append",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        256
+      ],
+      "id": "1cc94302-2ffd-4b43-845f-ed94d809be5e",
+      "name": "Determine Final Action"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "90223265-d7db-4487-8834-e8295d0787b9",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "update",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1248,
+        496
+      ],
+      "id": "c50ae04c-caeb-4e5f-8878-8572b772e59c",
+      "name": "Should Update?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return[\n  {\n    json:{\n      \"Date\":\"\",\n      \"Check_In\":\"\",\n      \"Check_Out\":\"\",\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        144,
+        -64
+      ],
+      "id": "b79ed433-2c55-476e-a7a6-624a420040dd",
+      "name": "Set Sheet Values"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "336fd314-fe89-40e0-921b-1ff98bac5a37",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "read_first",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        432,
+        400
+      ],
+      "id": "f65b6bd7-7a66-438a-a3e6-7674a7452c61",
+      "name": "Must Read Data"
+    },
+    {
+      "parameters": {
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.spreadsheetId }}/values/Working",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        384
+      ],
+      "id": "b6ea6ba8-9f06-4b1b-b7fd-228f7d3dda6a",
+      "name": "Read the sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GWErEwDjXXjlXdGe",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.spreadsheetId }}/values/{{ $json.range }}?valueInputOption=USER_ENTERED",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "values",
+              "value": "={{ $json.values }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1552,
+        480
+      ],
+      "id": "0bcf6a5b-2faa-4ed2-913a-ecbcd7279f99",
+      "name": "Update Check-Out Record",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GWErEwDjXXjlXdGe",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://sheets.googleapis.com/v4/spreadsheets/{{ $json.spreadsheetId }}/values/Working:append?valueInputOption=USER_ENTERED",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleSheetsOAuth2Api",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "values",
+              "value": "={{ $json.data.values}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1536,
+        240
+      ],
+      "id": "73ef7c7b-f04a-4345-bae0-148659d54517",
+      "name": "Append new Check-In",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GWErEwDjXXjlXdGe",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.line.me/v2/bot/message/push",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n    \"to\": \"Uf7d02f0711b65c8309127fa5f52aa462\",\n    \"messages\":[\n        {\n            \"type\":\"text\",\n            \"text\":\"早安 今天也簽到成功！😎\\n{{ $('Process Attendance').item.json.data.values[0][0] }} {{ $('Process Attendance').item.json.data.values[0][1] }}\"\n        }\n    ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1744,
+        240
+      ],
+      "id": "2fcdb2d1-085a-4ff9-b4cd-a7851d3d4136",
+      "name": "Send message to Line",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "GWErEwDjXXjlXdGe",
+          "name": "Google Sheets account"
+        },
+        "httpHeaderAuth": {
+          "id": "ASLlJS3LOTtRfdMs",
+          "name": "Line-work-traceing-OA"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "336fd314-fe89-40e0-921b-1ff98bac5a37",
+              "leftValue": "={{ $json.dayOfWeek.toString() }}",
+              "rightValue": "6",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "b03384e2-6879-481a-a445-76315c7143f6",
+              "leftValue": "={{ $json.dayOfWeek.toString() }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            },
+            {
+              "id": "ada0e43d-2aea-465d-aa51-5429abbc3eef",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        384
+      ],
+      "id": "e8c81089-da05-4a2b-bc45-3fa439e00324",
+      "name": "if not weekday"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Create spreadsheet": {
+      "main": [
+        [
+          {
+            "node": "Set Sheet Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search files and folders": {
+      "main": [
+        [
+          {
+            "node": "Return if Null",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Basic Data": {
+      "main": [
+        [
+          {
+            "node": "Complete Attendance Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Search files and folders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Complete Attendance Handler": {
+      "main": [
+        [
+          {
+            "node": "if not weekday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Return if Null": {
+      "main": [
+        [
+          {
+            "node": "Doesn't exist?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Doesn't exist?": {
+      "main": [
+        [
+          {
+            "node": "Create spreadsheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set Basic Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Attendance": {
+      "main": [
+        [
+          {
+            "node": "Determine Final Action",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Should Update?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Determine Final Action": {
+      "main": [
+        [
+          {
+            "node": "Append new Check-In",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Update?": {
+      "main": [
+        [
+          {
+            "node": "Update Check-Out Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Sheet Values": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Must Read Data": {
+      "main": [
+        [
+          {
+            "node": "Read the sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read the sheet": {
+      "main": [
+        [
+          {
+            "node": "Process Attendance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append new Check-In": {
+      "main": [
+        [
+          {
+            "node": "Send message to Line",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Check-Out Record": {
+      "main": [
+        []
+      ]
+    },
+    "if not weekday": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Must Read Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "27dace14-ce07-46f1-b312-3412cfdb3f3f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "04695fa805d662a7ca811a5d9568e6cc080c07e6ec9f81360f8146eccb701cc6"
+  },
+  "id": "FzKjp8T0ak5TNxBw",
+  "tags": []
+}
